@@ -3,17 +3,21 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use App\Models\Archivo;
+use Aws\S3\S3Client;
 
 class ArchivoController extends Controller
 {
     public function upload(Request $req)
     {
         $result = [];
-   
+
         if ($req->hasFile('files')) {
             foreach ($req->file('files') as $file) {
-                $filePath = $file->store('Archivos');
+                $filePath = $file->store('Archivos', 's3');
+
+                $url = env('AWS_URL') . '/' . $filePath;
 
                 $archivo = new Archivo();
                 $archivo->ruta = $filePath;
@@ -22,7 +26,7 @@ class ArchivoController extends Controller
 
                 $result[] = [
                     'id' => $archivo->id,
-                    'ruta' => $filePath,
+                    'ruta' => $url, 
                     'nombre_original' => $archivo->nombre_original,
                 ];
             }
@@ -33,9 +37,14 @@ class ArchivoController extends Controller
 
     public function download(Request $req, $id)
     {
+        // Encuentra el archivo en la base de datos
         $archivo = Archivo::findOrFail($id);
-        $filePath = storage_path('app/' . $archivo->ruta);
 
-        return response()->download($filePath);
+        // Construye la URL pública
+        $url = env('AWS_URL') . '/' . $archivo->ruta;
+
+        // Devuelve la URL al cliente
+        return response()->json(['download_url' => $url]);
     }
+    
 }
